@@ -4,6 +4,8 @@
 % Updated: 03/08/15
 %          08/14/16 - Rearranged layout
 %                   - Made code a little more efficient
+%          08/22/16 - Added output formatting for Inventor files
+%          09/22/16 - Added output formatting for Gmsh files
 
 function varargout = GUI_NACA_4_Digit_Airfoil(varargin)
 
@@ -115,6 +117,18 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+% EDIT ---------------------- Save Filename -------------------------------
+function editSaveFilename_CreateFcn(hObject, eventdata, handles)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% EDIT -------------- Chord Length for Inventor Output --------------------
+function editChord_CreateFcn(hObject, eventdata, handles)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
 % POP ---------------------- Grid Type ------------------------------------
 function popGridType_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
@@ -133,14 +147,14 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-% EDIT ---------------------- Save Filename -------------------------------
-function editSaveFilename_CreateFcn(hObject, eventdata, handles)
+% POP ------------------------- Save Style --------------------------------
+function popSaveType_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
 
-% POP ------------------------- Save Style --------------------------------
-function popSaveType_CreateFcn(hObject, eventdata, handles)
+% POP ---------------- Airfoil Units for Inventor Output ------------------
+function popUnits_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
@@ -196,6 +210,10 @@ end
 function editSaveFilename_Callback(hObject, eventdata, handles)
 % Do nothing, get string in pushSaveData_Callback
 
+% EDIT -------------- Chord Length for Inventor Output --------------------
+function editChord_Callback(hObject, eventdata, handles)
+% Do nothing, get value in pushSaveData_Callback
+
 % POP ----------------------- Grid Type -----------------------------------
 function popGridType_Callback(hObject, eventdata, handles)
 % Do nothing, get value in pushPlotAirfoil_Callback
@@ -210,6 +228,23 @@ function popPlotAs_Callback(hObject, eventdata, handles)
 
 % POP ----------------------- Save Style ----------------------------------
 function popSaveType_Callback(hObject, eventdata, handles)
+% Enable/disable certain features for saving depending on selection
+if (get(hObject,'Value') == 1 || get(hObject,'Value') == 2)
+    set(handles.editChord,'Enable','off');
+    set(handles.popUnits,'Enable','off');
+    set(handles.editSaveFilename,'String','NACA.txt');
+elseif (get(hObject,'Value') == 3)
+    set(handles.editChord,'Enable','on');
+    set(handles.popUnits,'Enable','on');
+    set(handles.editSaveFilename,'String','NACA.xlsx');
+elseif (get(hObject,'Value') == 4)
+    set(handles.editChord,'Enable','on');
+    set(handles.popUnits,'Enable','on');
+    set(handles.editSaveFilename,'String','NACA.geo');
+end
+
+% POP ---------------- Airfoil Units for Inventor Output ------------------
+function popUnits_Callback(hObject, eventdata, handles)
 % Do nothing, get value in pushSaveData_Callback
 
 % RADIO ------------------ Show Camber Line -------------------------------
@@ -379,6 +414,13 @@ drawnow();
 % Get save type from popup menu
 popSaveType = get(handles.popSaveType,'Value');
 
+% Get chord length from edit box
+chord    = str2double(get(handles.editChord,'String'));
+unitsStr = get(handles.popUnits,'String');
+unitsVal = get(handles.popUnits,'Value');
+assignin('base','unitsStr',unitsStr);
+assignin('base','unitsVal',unitsVal);
+
 % Get filename to which we are saving data
 saveFilename = get(handles.editSaveFilename,'String');
 
@@ -386,33 +428,109 @@ saveFilename = get(handles.editSaveFilename,'String');
 if (popSaveType == 1)                                                       % LE to TE (flip lower data)
     xl = flipud(xl);
     yl = flipud(yl);
-elseif (popSaveType == 2)                                                   % TE to LE (flip upper data)
+elseif (popSaveType == 2 || popSaveType == 3 || popSaveType == 4)           % TE to LE (flip upper data)
     xu = flipud(xu);
     yu = flipud(yu);
 end
 
-% File writing
-fid = fopen(saveFilename,'w');                                              % Open file for writing
-fprintf(fid,'    x        y \n');                                           % Print the single header line
+if (popSaveType == 1 || popSaveType == 2)
+    % File writing
+    fid = fopen(saveFilename,'w');                                          % Open file for writing
+    fprintf(fid,'    x        y \n');                                       % Print the single header line
 
-% Write upper data
-for i = 1:1:gridPts
-	fprintf(fid,'%2.6f %2.6f\n',xu(i),yu(i));
-end
-
-% Write lower data
-if (popSaveType == 1)                                                       % LE to TE
+    % Write upper data
     for i = 1:1:gridPts
-        fprintf(fid,'%2.6f %2.6f\n',xl(i),yl(i));
+        fprintf(fid,'%2.6f %2.6f\n',xu(i),yu(i));
     end
-elseif (popSaveType == 2)                                                   % TE to LE
-    for i = 2:1:gridPts
-        fprintf(fid,'%2.6f %2.6f\n',xl(i),yl(i));
-    end
-end
 
-% Close the written file
-fclose(fid);
+    % Write lower data
+    if (popSaveType == 1)                                                   % LE to TE
+        for i = 1:1:gridPts
+            fprintf(fid,'%2.6f %2.6f\n',xl(i),yl(i));
+        end
+    elseif (popSaveType == 2)                                               % TE to LE
+        for i = 2:1:gridPts
+            fprintf(fid,'%2.6f %2.6f\n',xl(i),yl(i));
+        end
+    end
+
+    % Close the written file
+    fclose(fid);
+elseif (popSaveType == 3)
+    % Multiply coordinates by the chord length
+    xl = xl*chord;                                                          % Multiply lower X data by chord
+    xu = xu*chord;                                                          % Multiply upper X data by chord 
+    yl = yl*chord;                                                          % Multiply lower Y data by chord
+    yu = yu*chord;                                                          % Multiply upper Y data by chord
+    
+    % Create array for writing
+    ind = 1;
+    for i = 1:1:gridPts
+        writeArray(ind,1) = xu(i);                                          % Write upper X data
+        writeArray(ind,2) = yu(i);                                          % Write upper Y data
+        ind = ind + 1;                                                      % Increment writing index
+    end
+    for i = 2:1:gridPts                                                     % Don't duplicate leading edge point
+        writeArray(ind,1) = xl(i);                                          % Write lower X data
+        writeArray(ind,2) = yl(i);                                          % Write lower Y data
+        ind = ind + 1;                                                      % Increment writing index
+    end
+    
+    % Close trailing edge by specifying our first write point
+    writeArray(end,1) = xu(1);                                              % Close trailing edge X data
+    writeArray(end,2) = yu(1);                                              % Close trailing edge Y data
+    
+    % Write data to the file
+    header = {unitsStr{unitsVal},'';'x','y'};                               % Header lines with units
+    xlswrite(saveFilename,header,1,'A1');                                   % Write the header line in file
+    xlswrite(saveFilename,writeArray,1,'A3');                               % Write the data in file
+elseif (popSaveType == 4)
+    % Multiply coordinates by the chord length
+    xl = xl*chord;                                                          % Multiply lower X data by chord
+    xu = xu*chord;                                                          % Multiply upper X data by chord 
+    yl = yl*chord;                                                          % Multiply lower Y data by chord
+    yu = yu*chord;                                                          % Multiply upper Y data by chord
+    
+    % Create array for writing
+    point = zeros(2*gridPts-1,3);
+    ind = 1;
+    for i = 1:1:gridPts
+        point(ind,1) = xu(i);
+        point(ind,2) = yu(i);
+        point(ind,3) = 0;
+        point(ind,4) = 1.0;
+        ind = ind + 1;
+    end
+    for i = 2:1:gridPts
+        point(ind,1) = xl(i);
+        point(ind,2) = yl(i);
+        point(ind,3) = 0;
+        point(ind,4) = 1.0;
+        ind = ind + 1;
+    end
+    assignin('base','point',point);
+    
+    % Number of points and lines
+    numPts = length(point(:,1));
+    numLns = numPts;
+    
+    % Write data to the .geo file
+    fid = fopen(saveFilename,'w');
+    for i = 1:1:numPts
+        fprintf(fid,'Point(%i) = {%g, %g, %g, %g};\r\n',i,point(i,1),point(i,2),...
+                                                    point(i,3),point(i,4));
+    end
+    for i = 1:1:numLns
+        if (i ~= numLns)
+            fprintf(fid,'Line(%i) = {%i, %i};\r\n',i,i,i+1);
+        else
+            fprintf(fid,'Line(%i) = {%i, %i};',i,i,1);
+        end
+    end
+    
+    % Close the written file
+    fclose(fid);
+end
 
 % Show that we are done saving the data file
 set(handles.pushSaveData,'ForegroundColor','k');
